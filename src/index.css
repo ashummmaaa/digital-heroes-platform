@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-forest-950: #08211a;
+    --color-forest-900: #0f382c;
+    --color-forest-800: #175242;
+    --color-forest-700: #1f6b57;
+    --color-forest-600: #298a71;
+    --color-forest-500: #35a88c;
+    --color-gold-600: #b89128;
+    --color-gold-500: #d4af37;
+    --color-gold-400: #e6c860;
+    --color-offwhite: #f9f9fb;
+  }
+
+  body {
+    background-color: var(--color-offwhite);
+    color: #1e293b;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Utilities for Digital Heroes Palette & UI */
+.bg-forest-950 { background-color: #08211a; }
+.bg-forest-900 { background-color: #0f382c; }
+.bg-forest-800 { background-color: #175242; }
+.bg-forest-700 { background-color: #1f6b57; }
+.bg-forest-50 { background-color: #f2f8f6; }
+
+.text-forest-900 { color: #0f382c; }
+.text-forest-800 { color: #175242; }
+.text-forest-700 { color: #1f6b57; }
+.border-forest-800 { border-color: #175242; }
+.border-forest-900 { border-color: #0f382c; }
+
+.bg-gold-500 { background-color: #d4af37; }
+.bg-gold-600 { background-color: #b89128; }
+.bg-gold-50 { background-color: #fdfbf2; }
+.text-gold-500 { color: #d4af37; }
+.text-gold-600 { color: #b89128; }
+.border-gold-500 { border-color: #d4af37; }
+
+/* Custom scrollbars & smooth transitions */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.4)); }
+  50% { opacity: 0.85; filter: drop-shadow(0 0 16px rgba(212, 175, 55, 0.7)); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
