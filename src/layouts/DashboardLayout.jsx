@@ -2,13 +2,13 @@ import React, { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Heart, Trophy, Award, CreditCard,
-  User, LogOut, Menu, X, Sparkles, Shield
+  LogOut, Menu, X
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Badge } from '../components/common/Badge'
 
 export const DashboardLayout = () => {
-  const { profile, subscription, signOut, switchDemoRole } = useAuth()
+  const { profile, subscription, signOut } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -23,6 +23,11 @@ export const DashboardLayout = () => {
   ]
 
   const isActive = (path) => location.pathname === path
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -98,11 +103,13 @@ export const DashboardLayout = () => {
           <div className="p-6 border-t border-slate-800 space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Status:</span>
-              <Badge variant="success">Active Plan</Badge>
+              <Badge variant={profile?.is_active ? 'success' : 'danger'}>
+                {profile?.is_active ? 'Active Plan' : 'Inactive'}
+              </Badge>
             </div>
 
             <button
-              onClick={signOut}
+              onClick={handleSignOut}
               className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 rounded-xl text-xs transition border border-slate-700"
             >
               <LogOut className="w-4 h-4" />

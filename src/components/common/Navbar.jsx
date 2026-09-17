@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Trophy, Shield, Heart, User, LogOut, Menu, X, Sparkles, LayoutDashboard } from 'lucide-react'
+import { Trophy, Shield, LayoutDashboard, LogOut, Menu, X, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 export const Navbar = () => {
@@ -10,48 +10,88 @@ export const Navbar = () => {
   const location = useLocation()
 
   const isActive = (path) => location.pathname === path
+  const showDemoToolbar = import.meta.env.VITE_ENABLE_DEMO_TOOLBAR === 'true'
+
+  // Helper function to derive display role label for Evaluator Toolbar
+  const currentRoleLabel = () => {
+    if (!user || !profile) return 'Public Visitor'
+    if (profile.role === 'admin') return 'Admin'
+    if (profile.role === 'subscriber') {
+      return profile.is_active ? 'Subscriber' : 'Inactive Subscriber'
+    }
+    return 'Public Visitor'
+  }
+
+  const handleDemoSwitch = (role) => {
+    switchDemoRole(role)
+    if (role === 'visitor') {
+      if (location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin')) {
+        navigate('/')
+      }
+    } else if (role === 'subscriber' || role === 'inactive_subscriber') {
+      navigate('/dashboard')
+    } else if (role === 'admin') {
+      navigate('/admin')
+    }
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
-      {/* DEMO ROLE SWITCHER BAR */}
-      <div className="bg-slate-900 text-slate-300 px-4 py-1.5 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-          <span className="font-semibold text-white">Evaluator Demo Toolbar:</span>
-          <span className="hidden sm:inline text-slate-400">Current Role:</span>
-          <span className="bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded capitalize">
-            {profile?.role || 'Public Visitor'}
-          </span>
-        </div>
+      
+      {/* DEMO ROLE SWITCHER BAR (Isolatable via VITE_ENABLE_DEMO_TOOLBAR) */}
+      {showDemoToolbar && (
+        <div className="bg-slate-900 text-slate-300 px-4 py-1.5 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span className="font-semibold text-white">Evaluator Demo Toolbar:</span>
+            <span className="hidden sm:inline text-slate-400">Current Role:</span>
+            <span className={`px-2 py-0.5 rounded font-bold uppercase tracking-wide text-[11px] ${
+              !user ? 'bg-slate-700 text-slate-200' :
+              isAdmin ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+              profile?.is_active ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+              'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+            }`}>
+              {currentRoleLabel()}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-slate-400 mr-1 hidden md:inline">Quick Switch:</span>
-          <button
-            onClick={() => { switchDemoRole('visitor'); navigate('/') }}
-            className={`px-2 py-1 rounded text-xs transition ${
-              !user ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            Visitor
-          </button>
-          <button
-            onClick={() => { switchDemoRole('subscriber'); navigate('/dashboard') }}
-            className={`px-2 py-1 rounded text-xs transition ${
-              isSubscriber ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            Subscriber View
-          </button>
-          <button
-            onClick={() => { switchDemoRole('admin'); navigate('/admin') }}
-            className={`px-2 py-1 rounded text-xs transition ${
-              isAdmin ? 'bg-amber-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            Admin Panel
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 mr-1 hidden md:inline">Quick Switch:</span>
+            <button
+              onClick={() => handleDemoSwitch('visitor')}
+              className={`px-2 py-1 rounded text-xs transition ${
+                !user ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              Visitor
+            </button>
+            <button
+              onClick={() => handleDemoSwitch('subscriber')}
+              className={`px-2 py-1 rounded text-xs transition ${
+                isSubscriber && profile?.is_active ? 'bg-emerald-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              Subscriber View
+            </button>
+            <button
+              onClick={() => handleDemoSwitch('inactive_subscriber')}
+              className={`px-2 py-1 rounded text-xs transition ${
+                isSubscriber && !profile?.is_active ? 'bg-rose-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              Inactive Sub
+            </button>
+            <button
+              onClick={() => handleDemoSwitch('admin')}
+              className={`px-2 py-1 rounded text-xs transition ${
+                isAdmin ? 'bg-amber-600 text-white font-semibold' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              Admin Panel
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* MAIN NAVBAR */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -68,7 +108,7 @@ export const Navbar = () => {
             </div>
           </Link>
 
-          {/* DESKTOP NAV LINKS */}
+          {/* DESKTOP PUBLIC NAV LINKS */}
           <nav className="hidden md:flex items-center gap-8">
             <Link to="/" className={`text-sm font-medium transition ${isActive('/') ? 'text-emerald-800 font-semibold' : 'text-slate-600 hover:text-slate-900'}`}>
               Home
@@ -79,12 +119,12 @@ export const Navbar = () => {
             <Link to="/charities" className={`text-sm font-medium transition ${isActive('/charities') ? 'text-emerald-800 font-semibold' : 'text-slate-600 hover:text-slate-900'}`}>
               Charities
             </Link>
-            <Link to="/pricing" className={`text-sm font-medium transition ${isActive('/pricing') ? 'text-emerald-800 font-semibold' : 'text-slate-600 hover:text-slate-900'}`}>
+            <Link to="/pricing" className={`text-sm font-medium transition ${isActive('/pricing') || isActive('/subscription-plans') ? 'text-emerald-800 font-semibold' : 'text-slate-600 hover:text-slate-900'}`}>
               Subscription Plans
             </Link>
           </nav>
 
-          {/* ACTION BUTTONS */}
+          {/* CONDITIONAL ACTION BUTTONS */}
           <div className="hidden md:flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-3">
@@ -107,7 +147,7 @@ export const Navbar = () => {
                 )}
 
                 <button
-                  onClick={signOut}
+                  onClick={() => { signOut(); navigate('/') }}
                   title="Sign Out"
                   className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
                 >
@@ -126,7 +166,7 @@ export const Navbar = () => {
                   to="/signup"
                   className="bg-emerald-900 hover:bg-emerald-950 text-white font-semibold px-4 py-2 rounded-xl text-sm transition shadow-md shadow-emerald-900/10"
                 >
-                  Get Started
+                  Join Now
                 </Link>
               </div>
             )}
@@ -188,7 +228,7 @@ export const Navbar = () => {
                   {isAdmin ? 'Admin Panel' : 'My Dashboard'}
                 </Link>
                 <button
-                  onClick={() => { signOut(); setMobileMenuOpen(false) }}
+                  onClick={() => { signOut(); setMobileMenuOpen(false); navigate('/') }}
                   className="w-full text-center text-slate-600 hover:bg-slate-100 py-2.5 rounded-xl text-sm font-medium"
                 >
                   Sign Out
@@ -208,7 +248,7 @@ export const Navbar = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full text-center bg-emerald-900 text-white font-semibold py-2 rounded-xl text-sm"
                 >
-                  Get Started
+                  Join Now
                 </Link>
               </>
             )}

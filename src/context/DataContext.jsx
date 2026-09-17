@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { supabase, isDemoMode } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import {
   initialCharities,
   initialCharityEvents,
@@ -16,15 +16,15 @@ const DataContext = createContext()
 export const DataProvider = ({ children }) => {
   const { user, profile } = useAuth()
 
-  // State Declarations
-  const [scores, setScores] = useState(initialUserScores)
+  // State Declarations - Default empty for private user data to prevent public data leakage
+  const [scores, setScores] = useState([])
   const [charities, setCharities] = useState(initialCharities)
   const [charityEvents, setCharityEvents] = useState(initialCharityEvents)
   const [selectedCharityId, setSelectedCharityId] = useState('charity-1')
   const [contributionPercentage, setContributionPercentage] = useState(20)
   const [draws, setDraws] = useState(initialDraws)
   const [prizePools, setPrizePools] = useState(initialPrizePools)
-  const [winnerSubmissions, setWinnerSubmissions] = useState(initialWinnerSubmissions)
+  const [winnerSubmissions, setWinnerSubmissions] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [notification, setNotification] = useState(null)
 
@@ -34,22 +34,44 @@ export const DataProvider = ({ children }) => {
     setTimeout(() => setNotification(null), 4000)
   }
 
-  // Load user-specific scores from Supabase or fallback
+  // Load user-specific scores & winnings ONLY when an authenticated user exists
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      setScores([])
+      setWinnerSubmissions([])
+      return
+    }
+
+    if (user.id === 'demo-subscriber-id') {
+      setScores(initialUserScores)
+      setWinnerSubmissions(initialWinnerSubmissions.filter(w => w.user_id === 'demo-subscriber-id'))
+    } else {
+      setScores([])
+      setWinnerSubmissions([])
+    }
+
     const fetchUserData = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: scoreData } = await supabase
           .from('scores')
           .select('*')
           .eq('user_id', user.id)
           .order('score_date', { ascending: false })
 
-        if (data && data.length > 0) {
-          setScores(data)
+        if (scoreData && scoreData.length > 0) {
+          setScores(scoreData)
+        }
+
+        const { data: winData } = await supabase
+          .from('winner_submissions')
+          .select('*')
+          .eq('user_id', user.id)
+
+        if (winData && winData.length > 0) {
+          setWinnerSubmissions(winData)
         }
       } catch (err) {
-        console.warn('Error fetching scores from Supabase:', err)
+        console.warn('Notice fetching scores/winnings from Supabase:', err)
       }
     }
     fetchUserData()
@@ -59,6 +81,11 @@ export const DataProvider = ({ children }) => {
   // GOLF SCORE MANAGEMENT (1-45 Stableford, Rolling 5 Limit)
   // ----------------------------------------------------
   const addScore = async (scoreVal, scoreDate) => {
+    if (!user) {
+      showToast('Authentication required to submit golf scores.', 'error')
+      return { success: false, error: 'Unauthorized' }
+    }
+
     const val = Number(scoreVal)
     if (val < 1 || val > 45) {
       showToast('Score must be between 1 and 45 Stableford points.', 'error')
@@ -74,13 +101,13 @@ export const DataProvider = ({ children }) => {
 
     const newScore = {
       id: `score-${Date.now()}`,
-      user_id: user?.id || 'demo-subscriber-id',
+      user_id: user.id,
       score: val,
       score_date: scoreDate,
       created_at: new Date().toISOString()
     }
 
-    // Rolling 5 Scores logic: sort descending, keep top 4 + new score = 5 total
+    // Rolling 5 Scores logic: sort descending by date, keep top 5
     let updatedScores = [newScore, ...scores]
       .sort((a, b) => new Date(b.score_date) - new Date(a.score_date))
       .slice(0, 5)
@@ -90,7 +117,7 @@ export const DataProvider = ({ children }) => {
     // Try Supabase insert
     try {
       await supabase.from('scores').insert({
-        user_id: user?.id || 'demo-subscriber-id',
+        user_id: user.id,
         score: val,
         score_date: scoreDate
       })
@@ -103,9 +130,10 @@ export const DataProvider = ({ children }) => {
   }
 
   const deleteScore = async (scoreId) => {
+    if (!user) return
     setScores(prev => prev.filter(s => s.id !== scoreId))
     try {
-      await supabase.from('scores').delete().eq('id', scoreId)
+      await supabase.from('scores').delete().eq('id', scoreId).eq('user_id', user.id)
     } catch (err) {
       console.info('Supabase delete score fallback:', err)
     }
@@ -113,6 +141,7 @@ export const DataProvider = ({ children }) => {
   }
 
   const editScore = async (scoreId, newVal) => {
+    if (!user) return
     const val = Number(newVal)
     if (val < 1 || val > 45) {
       showToast('Score must be between 1 and 45 points.', 'error')
@@ -120,15 +149,15 @@ export const DataProvider = ({ children }) => {
     }
     setScores(prev => prev.map(s => s.id === scoreId ? { ...s, score: val } : s))
     try {
-      await supabase.from('scores').update({ score: val }).eq('id', scoreId)
+      await supabase.from('scores').update({ score: val }).eq('id', scoreId).eq('user_id', user.id)
     } catch (err) {
       console.info('Supabase edit score fallback:', err)
     }
     showToast('Score updated successfully.')
   }
 
-  // Derive current user draw numbers
-  const userDrawNumbers = deriveDrawNumbersFromScores(scores, user?.id || 'demo-user')
+  // Derive current user draw numbers (returns [] if no scores or unauthenticated)
+  const userDrawNumbers = user ? deriveDrawNumbersFromScores(scores, user.id) : []
 
   // ----------------------------------------------------
   // CHARITY MANAGEMENT & SELECTION
@@ -165,10 +194,8 @@ export const DataProvider = ({ children }) => {
   // DRAW ENGINE & SIMULATOR
   // ----------------------------------------------------
   const simulateMonthDraw = (drawMonth, drawType = 'random') => {
-    // Generate 5 winning numbers in 1-45 range
     let winningNums = []
     if (drawType === 'algorithmic_frequency') {
-      // Frequency-weighted generation from player score pools
       const frequencies = scores.map(s => s.score)
       const basePool = frequencies.length > 0 ? frequencies : [14, 22, 34, 38, 41]
       while (winningNums.length < 5) {
@@ -188,17 +215,14 @@ export const DataProvider = ({ children }) => {
     }
     winningNums.sort((a, b) => a - b)
 
-    // Calculate subscriber pool metrics (1420 active subscribers * $19.99 * 40% prize allocation)
     const activeSubscribersCount = 1450
     const totalRevenue = activeSubscribersCount * 19.99
-    const prizePoolTotal = totalRevenue * 0.40 // 40% to prize pool
+    const prizePoolTotal = totalRevenue * 0.40
 
-    // Find previous tier 5 rollover if any
     const previousDraw = draws.find(d => d.status === 'published')
     const rolloverAmount = previousDraw ? (previousDraw.jackpot_rollover_amount || 0) : 1500.00
 
-    // Match counts calculation against user numbers
-    const matches = calculateMatchCount(userDrawNumbers, winningNums)
+    const matches = user ? calculateMatchCount(userDrawNumbers, winningNums) : 0
 
     const simulatedDraw = {
       id: `draw-${drawMonth}`,
@@ -212,10 +236,6 @@ export const DataProvider = ({ children }) => {
       executed_at: new Date().toISOString()
     }
 
-    // Tiers calculation:
-    // Tier 5: 40% of pool + rollover
-    // Tier 4: 35% of pool
-    // Tier 3: 25% of pool
     const tier5Final = (prizePoolTotal * 0.40) + rolloverAmount
     const tier4Final = prizePoolTotal * 0.35
     const tier3Final = prizePoolTotal * 0.25
@@ -269,29 +289,29 @@ export const DataProvider = ({ children }) => {
     setDraws(prev => [publishedDraw, ...prev.filter(d => d.id !== publishedDraw.id)])
     setPrizePools(prev => [...poolObjs, ...prev])
 
-    // If current user won a tier match (e.g. >= 3 matches), create winner submission
-    const userMatches = calculateMatchCount(userDrawNumbers, publishedDraw.winning_numbers)
-    if (userMatches >= 3) {
-      const tierPool = poolObjs.find(p => p.tier === userMatches)
-      if (tierPool) {
-        const newSubmission = {
-          id: `win-sub-${Date.now()}`,
-          draw_id: publishedDraw.id,
-          user_id: user?.id || 'demo-subscriber-id',
-          user_name: profile?.full_name || 'Alex Morgan',
-          user_email: profile?.email || 'alex.morgan@example.com',
-          tier: userMatches,
-          prize_amount: tierPool.payout_per_winner || 500,
-          proof_url: null,
-          status: 'pending_verification',
-          rejection_reason: null,
-          created_at: new Date().toISOString()
+    if (user) {
+      const userMatches = calculateMatchCount(userDrawNumbers, publishedDraw.winning_numbers)
+      if (userMatches >= 3) {
+        const tierPool = poolObjs.find(p => p.tier === userMatches)
+        if (tierPool) {
+          const newSubmission = {
+            id: `win-sub-${Date.now()}`,
+            draw_id: publishedDraw.id,
+            user_id: user.id,
+            user_name: profile?.full_name || 'Subscriber',
+            user_email: profile?.email || user.email,
+            tier: userMatches,
+            prize_amount: tierPool.payout_per_winner || 500,
+            proof_url: null,
+            status: 'pending_verification',
+            rejection_reason: null,
+            created_at: new Date().toISOString()
+          }
+          setWinnerSubmissions(prev => [newSubmission, ...prev])
         }
-        setWinnerSubmissions(prev => [newSubmission, ...prev])
       }
     }
 
-    // Add Audit Log
     const newLog = {
       id: `audit-${Date.now()}`,
       actor_id: profile?.id || 'admin',

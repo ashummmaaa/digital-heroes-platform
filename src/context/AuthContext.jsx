@@ -5,36 +5,58 @@ const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState({
-    id: 'demo-subscriber-id',
-    full_name: 'Alex Morgan',
-    email: 'alex.morgan@example.com',
-    role: 'subscriber',
-    is_active: true
-  })
-  const [subscription, setSubscription] = useState({
-    plan_type: 'monthly',
-    status: 'active',
-    current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-  })
+  const [profile, setProfile] = useState(null)
+  const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     // Supabase Session Listener
     const fetchSession = async () => {
+      setLoading(true)
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           setUser(session.user)
-          await loadProfile(session.user.id)
+          await loadProfileAndSubscription(session.user.id)
         } else {
-          // If no live session, initialize demo subscriber profile
-          setUser({ id: 'demo-subscriber-id', email: 'alex.morgan@example.com' })
+          // Unauthenticated Public Visitor by default
+          setUser(null)
+          setProfile(null)
+          setSubscription(null)
         }
       } catch (err) {
-        console.warn('Supabase Auth warning, using default state:', err)
+        console.warn('Supabase Auth check notice:', err)
+        setUser(null)
+        setProfile(null)
+        setSubscription(null)
       } finally {
         setLoading(false)
+      }
+    }
+
+    const loadProfileAndSubscription = async (userId) => {
+      try {
+        const { data: profData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (profData) {
+          setProfile(profData)
+        }
+
+        const { data: subData } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .single()
+
+        if (subData) {
+          setSubscription(subData)
+        }
+      } catch (err) {
+        console.warn('Error loading user profile or subscription from Supabase:', err)
       }
     }
 
@@ -43,11 +65,16 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        await loadProfile(session.user.id)
+        await loadProfileAndSubscription(session.user.id)
       } else {
-        setUser(null)
-        setProfile(null)
+        // Only clear if not in an active demo role state
+        if (!user?.id?.startsWith('demo-')) {
+          setUser(null)
+          setProfile(null)
+          setSubscription(null)
+        }
       }
+      setLoading(false)
     })
 
     return () => {
@@ -55,53 +82,62 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const loadProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (data) {
-        setProfile(data)
-      } else if (error && isDemoMode()) {
-        console.info('Demo profile active for:', userId)
-      }
-    } catch (err) {
-      console.warn('Error loading profile:', err)
-    }
-  }
-
-  // Quick Demo Role Switcher for instant evaluator testing
+  // Quick Demo Role Switcher for Evaluator testing & role switching
   const switchDemoRole = (role) => {
+    setLoading(true)
     if (role === 'admin') {
-      setUser({ id: 'demo-admin-id', email: 'admin@digitalheroes.org' })
-      setProfile({
+      const adminUser = { id: 'demo-admin-id', email: 'admin@digitalheroes.org' }
+      const adminProfile = {
         id: 'demo-admin-id',
         full_name: 'Sarah Connor (Admin)',
         email: 'admin@digitalheroes.org',
         role: 'admin',
         is_active: true
-      })
+      }
+      setUser(adminUser)
+      setProfile(adminProfile)
+      setSubscription(null)
     } else if (role === 'subscriber') {
-      setUser({ id: 'demo-subscriber-id', email: 'alex.morgan@example.com' })
-      setProfile({
+      const subUser = { id: 'demo-subscriber-id', email: 'alex.morgan@example.com' }
+      const subProfile = {
         id: 'demo-subscriber-id',
         full_name: 'Alex Morgan',
         email: 'alex.morgan@example.com',
         role: 'subscriber',
         is_active: true
-      })
-      setSubscription({
+      }
+      const subSubscription = {
         plan_type: 'monthly',
         status: 'active',
         current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-      })
+      }
+      setUser(subUser)
+      setProfile(subProfile)
+      setSubscription(subSubscription)
+    } else if (role === 'inactive_subscriber') {
+      const inactiveUser = { id: 'demo-inactive-id', email: 'jordan.lee@example.com' }
+      const inactiveProfile = {
+        id: 'demo-inactive-id',
+        full_name: 'Jordan Lee (Inactive)',
+        email: 'jordan.lee@example.com',
+        role: 'subscriber',
+        is_active: false
+      }
+      const inactiveSubscription = {
+        plan_type: 'monthly',
+        status: 'inactive',
+        current_period_end: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+      }
+      setUser(inactiveUser)
+      setProfile(inactiveProfile)
+      setSubscription(inactiveSubscription)
     } else {
+      // Visitor / Public
       setUser(null)
       setProfile(null)
+      setSubscription(null)
     }
+    setTimeout(() => setLoading(false), 50)
   }
 
   const signUp = async (email, password, fullName) => {
@@ -125,15 +161,25 @@ export const AuthProvider = ({ children }) => {
           role: 'subscriber',
           is_active: true
         })
+        setSubscription({
+          plan_type: 'monthly',
+          status: 'active',
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })
       }
       return { data, error: null }
     } catch (err) {
-      // Demo fallback if Supabase keys are default
       if (isDemoMode()) {
         const fakeId = `user-${Date.now()}`
         const newProf = { id: fakeId, full_name: fullName, email, role: 'subscriber', is_active: true }
+        const newSub = {
+          plan_type: 'monthly',
+          status: 'active',
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        }
         setUser({ id: fakeId, email })
         setProfile(newProf)
+        setSubscription(newSub)
         return { data: { user: newProf }, error: null }
       }
       return { data: null, error: err }
@@ -149,7 +195,7 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error
       if (data.user) {
         setUser(data.user)
-        await loadProfile(data.user.id)
+        await loadProfileAndSubscription(data.user.id)
       }
       return { data, error: null }
     } catch (err) {
@@ -165,14 +211,21 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signOut = async () => {
+    setLoading(true)
     try {
       await supabase.auth.signOut()
     } catch (err) {
-      console.warn('Sign out:', err)
+      console.warn('Sign out notice:', err)
     }
     setUser(null)
     setProfile(null)
+    setSubscription(null)
+    setLoading(false)
   }
+
+  const isAdmin = profile?.role === 'admin'
+  const isSubscriber = profile?.role === 'subscriber'
+  const hasActiveSubscription = profile?.is_active === true && (subscription?.status === 'active' || !subscription)
 
   return (
     <AuthContext.Provider
@@ -186,8 +239,9 @@ export const AuthProvider = ({ children }) => {
         signIn,
         signOut,
         switchDemoRole,
-        isAdmin: profile?.role === 'admin',
-        isSubscriber: profile?.role === 'subscriber'
+        isAdmin,
+        isSubscriber,
+        hasActiveSubscription
       }}
     >
       {children}

@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { DataProvider } from './context/DataContext'
 
+// Protected Route Guards
+import { PublicRoute, ActiveSubscriberRoute, AdminRoute } from './components/routes/ProtectedRoutes'
+
 // Layouts
 import { MainLayout } from './layouts/MainLayout'
 import { DashboardLayout } from './layouts/DashboardLayout'
@@ -16,6 +19,7 @@ import { CharityDetailPage } from './pages/public/CharityDetailPage'
 import { PricingPage } from './pages/public/PricingPage'
 import { LoginPage } from './pages/public/LoginPage'
 import { SignupPage } from './pages/public/SignupPage'
+import { UnauthorizedPage } from './pages/public/UnauthorizedPage'
 
 // Subscriber Pages
 import { DashboardOverview } from './pages/subscriber/DashboardOverview'
@@ -40,39 +44,47 @@ export default function App() {
       <AuthProvider>
         <DataProvider>
           <Routes>
-            {/* Public Layout */}
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Home />} />
-              <Route path="how-it-works" element={<HowItWorksPage />} />
-              <Route path="charities" element={<CharitiesPage />} />
-              <Route path="charities/:id" element={<CharityDetailPage />} />
-              <Route path="pricing" element={<PricingPage />} />
-              <Route path="login" element={<LoginPage />} />
-              <Route path="signup" element={<SignupPage />} />
+            {/* Public Routes */}
+            <Route element={<PublicRoute />}>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Home />} />
+                <Route path="how-it-works" element={<HowItWorksPage />} />
+                <Route path="charities" element={<CharitiesPage />} />
+                <Route path="charities/:id" element={<CharityDetailPage />} />
+                <Route path="pricing" element={<PricingPage />} />
+                <Route path="subscription-plans" element={<PricingPage />} />
+                <Route path="login" element={<LoginPage />} />
+                <Route path="signup" element={<SignupPage />} />
+                <Route path="unauthorized" element={<UnauthorizedPage />} />
+              </Route>
             </Route>
 
-            {/* Subscriber Dashboard Layout */}
-            <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<DashboardOverview />} />
-              <Route path="scores" element={<ScoresPage />} />
-              <Route path="charity" element={<CharitySelectionPage />} />
-              <Route path="draws" element={<DrawsPage />} />
-              <Route path="winnings" element={<WinningsPage />} />
-              <Route path="subscription" element={<SubscriptionPage />} />
+            {/* Protected Subscriber Dashboard Layout */}
+            <Route element={<ActiveSubscriberRoute />}>
+              <Route path="/dashboard" element={<DashboardLayout />}>
+                <Route index element={<DashboardOverview />} />
+                <Route path="scores" element={<ScoresPage />} />
+                <Route path="charity" element={<CharitySelectionPage />} />
+                <Route path="draws" element={<DrawsPage />} />
+                <Route path="winnings" element={<WinningsPage />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
+              </Route>
             </Route>
 
-            {/* Admin Dashboard Layout */}
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboardPage />} />
-              <Route path="users" element={<AdminUsersPage />} />
-              <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
-              <Route path="charities" element={<AdminCharitiesPage />} />
-              <Route path="draws" element={<AdminDrawsPage />} />
-              <Route path="winners" element={<AdminWinnersPage />} />
-              <Route path="reports" element={<AdminReportsPage />} />
+            {/* Protected Admin Dashboard Layout */}
+            <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+                <Route path="charities" element={<AdminCharitiesPage />} />
+                <Route path="draws" element={<AdminDrawsPage />} />
+                <Route path="winners" element={<AdminWinnersPage />} />
+                <Route path="reports" element={<AdminReportsPage />} />
+              </Route>
             </Route>
 
-            {/* Fallback */}
+            {/* Fallback Catch-All */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </DataProvider>

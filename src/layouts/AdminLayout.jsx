@@ -2,13 +2,12 @@ import React, { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Shield, LayoutDashboard, Users, CreditCard, Heart, Trophy, Award,
-  FileText, LogOut, Menu, X, Sparkles, AlertTriangle
+  FileText, LogOut, Menu, X
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { Badge } from '../components/common/Badge'
 
 export const AdminLayout = () => {
-  const { profile, isAdmin, switchDemoRole } = useAuth()
+  const { profile, signOut, switchDemoRole } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -24,6 +23,11 @@ export const AdminLayout = () => {
   ]
 
   const isActive = (path) => location.pathname === path
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -102,6 +106,13 @@ export const AdminLayout = () => {
               className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 rounded-xl text-xs transition border border-slate-700"
             >
               Switch to Subscriber View
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-center gap-2 bg-slate-950 hover:bg-slate-900 text-slate-400 hover:text-white font-semibold py-2 rounded-xl text-xs transition border border-slate-800"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
             </button>
           </div>
         </aside>
